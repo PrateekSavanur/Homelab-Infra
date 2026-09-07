@@ -12,6 +12,9 @@ kubeconfig.yaml
 *.retry
 /tmp/
 
+# Ansible secrets
+ansible/inventory/group_vars/
+
 # SSH keys
 *.pem
 id_rsa
