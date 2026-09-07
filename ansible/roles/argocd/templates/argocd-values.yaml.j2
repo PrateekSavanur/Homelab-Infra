@@ -1,0 +1,46 @@
+server:
+  insecure: true          # Traefik handles TLS termination; ArgoCD runs plain HTTP internally
+  extraArgs:
+    - --insecure
+
+configs:
+  params:
+    server.insecure: "true"
+
+  cm:
+    # Allow ArgoCD to manage resources in any namespace
+    application.resourceTrackingMethod: annotation
+
+global:
+  # Reduce resource footprint for homelab
+  nodeSelector: {}
+
+repoServer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+applicationSet:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+notifications:
+  enabled: false      # enable later if you want Slack/email alerts

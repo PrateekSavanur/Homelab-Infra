@@ -1,0 +1,49 @@
+---
+# ── k3s version ──────────────────────────────────────────────────
+# Check latest: https://github.com/k3s-io/k3s/releases
+k3s_version: "v1.31.3+k3s1"
+
+# ── Cluster secret ────────────────────────────────────────────────
+# Generate with: openssl rand -hex 32
+k3s_token: "984429818218bcae0348ace8ca1e7f9278a95ce734b4f721dccdae3193c3ec85"
+
+# ── API server ───────────────────────────────────────────────────
+k3s_api_server: "https://192.168.68.110:6443"
+
+# ── MetalLB ──────────────────────────────────────────────────────
+metallb_ip_range: "192.168.68.200-192.168.68.220"
+
+# ── Helm ─────────────────────────────────────────────────────────
+helm_version: "v3.16.2"
+
+# ── Ingress domain suffixes ───────────────────────────────────────
+jellyfin_hostname:  "jellyfin.homelab.local"
+website_hostname:   "www.homelab.local"
+
+# ── Jellyfin ─────────────────────────────────────────────────────
+jellyfin_image:    "jellyfin/jellyfin:latest"
+jellyfin_node:     "k3s-worker-2"   # Must match the node with HDD
+jellyfin_nodeport: 30096             # Accessible via Tailscale at <worker-2-ts-ip>:30096
+
+# ── ArgoCD ───────────────────────────────────────────────────────
+argocd_version:    "7.8.0"
+argocd_hostname:   "argocd.homelab.local"
+
+# Your Git repo URLs — update these before running the argocd playbook
+homelab_repo_url:   "https://github.com/PrateekSavanur/homelab-IAC.git"
+portfolio_repo_url: "https://github.com/PrateekSavanur/ArgoCD-Enabled-Website"
+
+# Set to true if repos are private (needs repo_username + repo_password below)
+repos_are_private: false
+repo_username: ""      # GitHub username or token name
+repo_password: ""      # GitHub personal access token (keep out of git!)
+
+# ── Cloudflare Tunnel ─────────────────────────────────────────────
+# After: terraform apply && terraform output -raw cloudflare_tunnel_token
+# Paste the token value here (keep this file out of git OR use ansible-vault)
+cloudflared_tunnel_token: "eyJhIjoiOTFiZDdjNzVmMjgwYTI1ZmI3Mzc5Yjg2Yzg5MTMxZDgiLCJ0IjoiYTBkNTdhODctNTMyYi00MTAwLTkwOTUtODc5YTc2MjFlOWE5IiwicyI6Ill0KzVkeDRndmMwbm9OZGhhT00xd1BWSDlLWlNhdW0yT1Vxa3JkY09Ibk09In0="
+
+# ── Tailscale ─────────────────────────────────────────────────────
+# Generate a reusable auth key at: https://login.tailscale.com/admin/settings/keys
+# Recommended: set expiry, tag as "homelab"
+tailscale_auth_key: "tskey-auth-k2MQjmBtuQ11CNTRL-Lj2ohpzN7fQeFvPV4msSfQrHpGqxLjLYZ"

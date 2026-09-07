@@ -1,0 +1,23 @@
+# Terraform state and secrets
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Ansible generated files
+ansible/kubeconfig.yaml
+kubeconfig.yaml
+*.retry
+/tmp/
+
+# SSH keys
+*.pem
+id_rsa
+id_ed25519
+
+# Editor
+.vscode/
+.idea/
+*.swp

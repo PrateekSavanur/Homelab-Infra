@@ -1,0 +1,37 @@
+---
+- name: Create cloudflared namespace
+  ansible.builtin.shell: |
+    kubectl create namespace cloudflared --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create tunnel token Secret
+  ansible.builtin.shell: |
+    kubectl -n cloudflared create secret generic cloudflared-token \
+      --from-literal=token={{ cloudflared_tunnel_token }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Deploy cloudflared Deployment
+  ansible.builtin.shell: |
+    kubectl apply -f /tmp/cloudflared-deployment.yml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for cloudflared to be ready
+  ansible.builtin.shell: |
+    kubectl -n cloudflared rollout status deployment/cloudflared --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Verify tunnel is connected
+  ansible.builtin.debug:
+    msg:
+      - "cloudflared deployed. Verify at: https://one.dash.cloudflare.com/networks/tunnels"
+      - "Portfolio should be live at: https://prateeksavanur.dev"

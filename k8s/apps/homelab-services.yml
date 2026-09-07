@@ -1,0 +1,25 @@
+# Homelab services Application
+# ArgoCD watches k8s/manifests/ in this repo for Jellyfin and shared storage
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homelab-services
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/homelab.git   # ← update this
+    targetRevision: HEAD
+    path: k8s/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homelab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

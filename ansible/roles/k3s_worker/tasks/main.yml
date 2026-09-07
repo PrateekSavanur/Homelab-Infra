@@ -1,0 +1,96 @@
+---
+# ── k3s agent config ──────────────────────────────────────────────
+- name: Create /etc/rancher/k3s directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Write k3s agent config
+  ansible.builtin.template:
+    src: k3s-agent-config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+
+# ── Install k3s agent ─────────────────────────────────────────────
+- name: Check if k3s binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Download and install k3s agent
+  ansible.builtin.shell:
+    cmd: |
+      curl -sfL https://get.k3s.io | \
+        INSTALL_K3S_VERSION="{{ k3s_version }}" \
+        sh -s - agent
+    creates: /usr/local/bin/k3s
+  when: not k3s_binary.stat.exists
+
+- name: Enable and start k3s-agent service
+  ansible.builtin.service:
+    name: k3s-agent
+    state: started
+    enabled: true
+
+# ── Node labels ───────────────────────────────────────────────────
+# Label the media node so Jellyfin can target it via nodeSelector
+- name: Wait for node to register with master
+  ansible.builtin.pause:
+    seconds: 20
+  when: node_label_media is defined and node_label_media == "true"
+
+- name: Label media worker node
+  ansible.builtin.shell: >
+    k3s kubectl label node {{ inventory_hostname }}
+    storage-type=media
+    --overwrite
+  delegate_to: k3s-master-1
+  when: node_label_media is defined and node_label_media == "true"
+  changed_when: false
+
+# ── Format and mount HDD for Jellyfin (worker-2 only) ─────────────
+- name: Check if media disk is already formatted
+  ansible.builtin.command: blkid {{ media_disk_device }}
+  register: blkid_result
+  changed_when: false
+  failed_when: false
+  when: has_media_disk | default(false)
+
+- name: Format media disk with ext4
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ media_disk_device }}"
+    opts: "-L media"
+  when:
+    - has_media_disk | default(false)
+    - blkid_result.rc != 0  # only format if not already formatted
+
+- name: Create media mount point
+  ansible.builtin.file:
+    path: "{{ media_mount_path }}"
+    state: directory
+    mode: "0755"
+  when: has_media_disk | default(false)
+
+- name: Mount media disk
+  ansible.posix.mount:
+    path: "{{ media_mount_path }}"
+    src: "{{ media_disk_device }}"
+    fstype: ext4
+    opts: defaults,noatime
+    state: mounted
+  when: has_media_disk | default(false)
+
+- name: Create Jellyfin subdirectories on HDD
+  ansible.builtin.file:
+    path: "{{ media_mount_path }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - jellyfin/config
+    - jellyfin/cache
+    - movies
+    - tvshows
+    - music
+  when: has_media_disk | default(false)

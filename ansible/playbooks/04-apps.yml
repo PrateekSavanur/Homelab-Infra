@@ -1,0 +1,6 @@
+---
+- name: Deploy applications to k3s
+  hosts: k3s_master
+  become: true
+  roles:
+    - k3s_apps

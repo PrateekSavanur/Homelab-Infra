@@ -1,0 +1,25 @@
+# Portfolio website Application
+# ArgoCD watches the k8s/ directory IN YOUR PORTFOLIO REPO
+# Add a k8s/ folder to your portfolio repo with deployment.yml, service.yml, ingress.yml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: portfolio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/YOUR_USERNAME/portfolio.git   # ← update this
+    targetRevision: HEAD
+    path: k8s                    # folder inside your portfolio repo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homelab
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

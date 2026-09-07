@@ -1,0 +1,27 @@
+# k3s server configuration — written to /etc/rancher/k3s/config.yaml
+# All flags here are equivalent to CLI flags passed to `k3s server`
+
+cluster-init: true                   # Bootstrap embedded etcd (HA-ready)
+token: "{{ k3s_token }}"
+write-kubeconfig-mode: "644"
+
+# Networking
+node-ip: "{{ k3s_master_ip }}"
+advertise-address: "{{ k3s_master_ip }}"
+flannel-iface: "eth0"
+
+# Disable built-in components — we install our own with Helm for more control
+disable:
+  - traefik
+  - servicelb
+
+# TLS SANs — include LAN IP and Proxmox host so kubeconfig works from any machine on the subnet
+tls-san:
+  - "{{ k3s_master_ip }}"
+  - "k3s-master-1"
+  - "192.168.68.102"   # Proxmox host IP (useful if accessing cluster via host)
+
+# Etcd snapshots to /mnt/etcd-snapshots (created by role)
+etcd-snapshot-dir: "/var/lib/rancher/k3s/server/db/snapshots"
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 5

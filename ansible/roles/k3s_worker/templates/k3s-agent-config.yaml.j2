@@ -1,0 +1,6 @@
+# k3s agent configuration — written to /etc/rancher/k3s/config.yaml on workers
+server: "{{ k3s_api_server }}"
+token: "{{ k3s_token }}"
+
+node-ip: "{{ ansible_host }}"
+flannel-iface: "eth0"

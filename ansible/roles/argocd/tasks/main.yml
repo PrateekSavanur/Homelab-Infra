@@ -1,0 +1,181 @@
+---
+# ── Helm repo ─────────────────────────────────────────────────────
+- name: Add ArgoCD Helm repo
+  ansible.builtin.shell: |
+    helm repo add argo https://argoproj.github.io/argo-helm
+    helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+# ── Install ArgoCD ────────────────────────────────────────────────
+- name: Copy ArgoCD Helm values
+  ansible.builtin.template:
+    src: argocd-values.yaml.j2
+    dest: /tmp/argocd-values.yaml
+    mode: "0644"
+
+- name: Install ArgoCD via Helm
+  ansible.builtin.shell: |
+    helm upgrade --install argocd argo/argo-cd \
+      --namespace argocd \
+      --create-namespace \
+      --version {{ argocd_version }} \
+      -f /tmp/argocd-values.yaml \
+      --wait \
+      --timeout 8m
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: argocd_install
+  changed_when: "'deployed' in argocd_install.stdout or 'upgraded' in argocd_install.stdout"
+
+# ── Ingress ───────────────────────────────────────────────────────
+- name: Create ArgoCD Ingress
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      name: argocd-server
+      namespace: argocd
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    spec:
+      ingressClassName: traefik
+      rules:
+        - host: {{ argocd_hostname }}
+          http:
+            paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: argocd-server
+                    port:
+                      number: 80
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+# ── Register Git repos ────────────────────────────────────────────
+# For public repos this is optional but good practice (avoids rate-limiting)
+- name: Register homelab repo with ArgoCD
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: homelab-repo
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+    stringData:
+      type: git
+      url: https://github.com/PrateekSavanur/homelab-IAC.git
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Register portfolio repo with ArgoCD
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: portfolio-repo
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+    stringData:
+      type: git
+      url: {{ portfolio_repo_url }}
+      {% if repos_are_private %}
+      username: {{ repo_username }}
+      password: {{ repo_password }}
+      {% endif %}
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: "{{ repos_are_private }}"
+
+# ── ArgoCD Project ────────────────────────────────────────────────
+- name: Create homelab ArgoCD project
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: argoproj.io/v1alpha1
+    kind: AppProject
+    metadata:
+      name: homelab
+      namespace: argocd
+    spec:
+      description: "Homelab services"
+      sourceRepos:
+        - {{ homelab_repo_url }}
+        - {{ portfolio_repo_url }}
+      destinations:
+        - namespace: "*"
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: "*"
+          kind: "*"
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+# ── Root App (App of Apps) ────────────────────────────────────────
+# This single Application points at k8s/apps/ in the homelab repo.
+# ArgoCD discovers all Application YAMLs in that folder automatically.
+- name: Apply root App-of-Apps
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: root
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: homelab
+      source:
+        repoURL: {{ homelab_repo_url }}
+        targetRevision: HEAD
+        path: k8s/apps
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+# ── Print credentials ──────────────────────────────────────────────
+- name: Retrieve initial admin password
+  ansible.builtin.shell: |
+    kubectl -n argocd get secret argocd-initial-admin-secret \
+      -o jsonpath='{.data.password}' | base64 -d
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: argocd_init_password
+  changed_when: false
+
+- name: Print ArgoCD access details
+  ansible.builtin.debug:
+    msg:
+      - "============================================"
+      - " ArgoCD is ready!"
+      - " URL:      http://{{ argocd_hostname }}"
+      - " Username: admin"
+      - " Password: {{ argocd_init_password.stdout }}"
+      - " Change password after first login!"
+      - "============================================"

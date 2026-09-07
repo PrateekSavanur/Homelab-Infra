@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: homelab
+  labels:
+    app: jellyfin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyfin
+  strategy:
+    type: Recreate    # Recreate avoids two pods trying to mount the same hostPath
+  template:
+    metadata:
+      labels:
+        app: jellyfin
+    spec:
+      # Pin Jellyfin to the node with the HDD (labeled storage-type=media by Ansible)
+      nodeSelector:
+        storage-type: media
+
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8096
+              name: http
+          env:
+            - name: JELLYFIN_PublishedServerUrl
+              value: "http://jellyfin.homelab.local"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          volumeMounts:
+            - name: media
+              mountPath: /media
+              subPath: ""
+            - name: config
+              mountPath: /config
+            - name: cache
+              mountPath: /cache
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8096
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8096
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: jellyfin-media-pvc
+        - name: config
+          hostPath:
+            path: /mnt/media/jellyfin/config
+            type: DirectoryOrCreate
+        - name: cache
+          hostPath:
+            path: /mnt/media/jellyfin/cache
+            type: DirectoryOrCreate

@@ -1,0 +1,6 @@
+---
+- name: Install AdGuard Home on LXC container
+  hosts: adguard_hosts
+  become: true
+  roles:
+    - adguard

@@ -1,0 +1,93 @@
+---
+- name: Create homelab namespace
+  ansible.builtin.shell: |
+    kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: homelab
+        labels:
+          app.kubernetes.io/managed-by: ansible
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create manifest directories on master
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /tmp/k3s-manifests/storage
+    - /tmp/k3s-manifests/jellyfin
+    - /tmp/k3s-manifests/website
+
+# ── Storage (HostPath PV for Jellyfin on HDD) ────────────────────
+- name: Copy storage manifests to master
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /tmp/k3s-manifests/storage/
+    mode: "0644"
+  loop:
+    - files/storage/media-pv.yml
+    - files/storage/media-pvc.yml
+
+# ── Jellyfin ──────────────────────────────────────────────────────
+- name: Copy Jellyfin manifests to master
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /tmp/k3s-manifests/jellyfin/
+    mode: "0644"
+  loop:
+    - files/jellyfin/deployment.yml
+    - files/jellyfin/service.yml
+    - files/jellyfin/ingress.yml
+
+# ── Website ───────────────────────────────────────────────────────
+- name: Copy website manifests to master
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /tmp/k3s-manifests/website/
+    mode: "0644"
+  loop:
+    - files/website/configmap.yml
+    - files/website/deployment.yml
+    - files/website/service.yml
+    - files/website/ingress.yml
+
+- name: Apply all manifests
+  ansible.builtin.shell: |
+    kubectl apply -f /tmp/k3s-manifests/storage/ &&
+    kubectl apply -f /tmp/k3s-manifests/jellyfin/ &&
+    kubectl apply -f /tmp/k3s-manifests/website/
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for Jellyfin deployment
+  ansible.builtin.shell: |
+    kubectl -n homelab rollout status deployment/jellyfin --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for website deployment
+  ansible.builtin.shell: |
+    kubectl -n homelab rollout status deployment/website --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Show service endpoints
+  ansible.builtin.shell: |
+    kubectl -n homelab get svc,ingress
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: svc_output
+  changed_when: false
+
+- name: Print service endpoints
+  ansible.builtin.debug:
+    msg: "{{ svc_output.stdout_lines }}"

@@ -1,0 +1,21 @@
+---
+# Master playbook — run this to configure the entire homelab from scratch.
+# Usage: ansible-playbook playbooks/site.yml
+
+- name: "Step 1 — Common baseline for ALL nodes"
+  import_playbook: 01-common.yml
+
+- name: "Step 2 — k3s cluster (master + workers)"
+  import_playbook: 02-k3s.yml
+
+- name: "Step 3 — AdGuard Home DNS"
+  import_playbook: 03-adguard.yml
+
+- name: "Step 4 — Deploy applications to k3s"
+  import_playbook: 04-apps.yml
+
+- name: "Step 5 — ArgoCD GitOps (homelab + portfolio)"
+  import_playbook: 05-argocd.yml
+
+- name: "Step 6 — Cloudflare Tunnel + Tailscale"
+  import_playbook: 06-tunnel.yml

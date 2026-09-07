@@ -1,0 +1,38 @@
+---
+# Run after terraform apply and after pasting the tunnel token into group_vars/k3s_cluster.yml
+# Usage: ansible-playbook playbooks/06-tunnel.yml
+
+- name: Deploy cloudflared tunnel (portfolio public access)
+  hosts: k3s_master
+  become: true
+  pre_tasks:
+    - name: Copy cloudflared deployment manifest to master
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../k8s/manifests/cloudflared/deployment.yml"
+        dest: /tmp/cloudflared-deployment.yml
+        mode: "0644"
+  roles:
+    - cloudflared
+
+- name: Install Tailscale on all k3s nodes (Jellyfin remote access)
+  hosts: k3s_cluster
+  become: true
+  roles:
+    - tailscale
+
+- name: Print access summary
+  hosts: k3s_master
+  become: false
+  tasks:
+    - name: Summary
+      ansible.builtin.debug:
+        msg:
+          - "=================================================="
+          - " Tunnel & Remote Access Setup Complete"
+          - "=================================================="
+          - " Portfolio (public):  https://prateeksavanur.dev"
+          - " Portfolio (www):     https://www.prateeksavanur.dev"
+          - " Jellyfin (Tailscale): http://<worker-2-ts-ip>:30096"
+          - "  → run: tailscale ip on k3s-worker-2 to get the IP"
+          - "  → or enable MagicDNS: http://k3s-worker-2:30096"
+          - "=================================================="

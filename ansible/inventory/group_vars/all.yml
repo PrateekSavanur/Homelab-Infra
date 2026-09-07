@@ -1,0 +1,16 @@
+---
+# ── Timezone & Locale ────────────────────────────────────────────
+timezone: "America/New_York"   # Change to your timezone
+
+# ── Homelab domain ────────────────────────────────────────────────
+homelab_domain: "homelab.local"
+
+# ── IPs (mirrors terraform.tfvars) ───────────────────────────────
+adguard_ip:     "192.168.68.50"
+k3s_master_ip:  "192.168.68.110"
+k3s_worker_ips:
+  - "192.168.68.111"
+  - "192.168.68.112"
+
+# ── Media mount ───────────────────────────────────────────────────
+media_mount_path: "/mnt/media"

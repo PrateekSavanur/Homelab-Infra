@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: website-content
+  namespace: homelab
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>My Homelab</title>
+      <style>
+        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
+               display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1e293b; border-radius: 12px; padding: 2rem 3rem; text-align: center; }
+        h1 { color: #38bdf8; margin-bottom: 0.5rem; }
+        a { color: #38bdf8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        ul { list-style: none; padding: 0; }
+        li { margin: 0.5rem 0; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>My Homelab</h1>
+        <p>Running on k3s + Proxmox</p>
+        <ul>
+          <li><a href="http://jellyfin.homelab.local">🎬 Jellyfin</a></li>
+          <li><a href="http://adguard.homelab.local:3000">🛡️ AdGuard Home</a></li>
+        </ul>
+      </div>
+    </body>
+    </html>
+  nginx.conf: |
+    server {
+      listen 80;
+      root /usr/share/nginx/html;
+      index index.html;
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+    }

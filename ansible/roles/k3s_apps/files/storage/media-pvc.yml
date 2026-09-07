@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyfin-media-pvc
+  namespace: homelab
+spec:
+  storageClassName: local-media
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1800Gi
+  selector:
+    matchLabels:
+      storage-type: media
