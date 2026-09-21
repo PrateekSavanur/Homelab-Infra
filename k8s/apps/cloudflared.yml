@@ -9,7 +9,7 @@ metadata:
 spec:
   project: homelab
   source:
-    repoURL: https://github.com/PrateekSavanur/ArgoCD-Enabled-Website  # ← same as homelab_repo_url
+    repoURL: https://github.com/PrateekSavanur/Homelab-Infra.git # ← same as homelab_repo_url
     targetRevision: HEAD
     path: k8s/manifests/cloudflared
   destination:
