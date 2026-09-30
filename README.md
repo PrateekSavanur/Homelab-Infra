@@ -206,3 +206,8 @@ homelab/
         ├── adguard/           # AdGuard Home binary + config
         └── k3s_apps/          # Jellyfin + website manifests
 ```
+
+## Visual Diagram
+
+<img width="5400" height="6220" alt="diagram" src="https://github.com/user-attachments/assets/0420284d-e7b4-4b52-ba5a-248430d71d30" />
+
