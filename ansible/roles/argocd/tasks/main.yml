@@ -90,16 +90,11 @@
         argocd.argoproj.io/secret-type: repository
     stringData:
       type: git
-      url: {{ portfolio_repo_url }}
-      {% if repos_are_private %}
-      username: {{ repo_username }}
-      password: {{ repo_password }}
-      {% endif %}
+      url: "{{ portfolio_repo_url }}"
     EOF
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
-  no_log: "{{ repos_are_private }}"
 
 # ── ArgoCD Project ────────────────────────────────────────────────
 - name: Create homelab ArgoCD project

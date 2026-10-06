@@ -33,16 +33,8 @@ dns:
     pixabay: true
     yandex: true
     youtube: true
-  rewrites:
-    # Local DNS entries for homelab services
-    - domain: "jellyfin.{{ homelab_domain }}"
-      answer: "192.168.68.200"    # MetalLB Traefik IP
-    - domain: "www.{{ homelab_domain }}"
-      answer: "192.168.68.200"
-    - domain: "adguard.{{ homelab_domain }}"
-      answer: "{{ adguard_ip }}"
-    - domain: "argocd.{{ homelab_domain }}"
-      answer: "192.168.68.200"
+  # NOTE: local DNS rewrites live under filtering.rewrites (schema_version 28),
+  # not here. A dns.rewrites block is ignored.
   upstream_dns:
     - https://dns10.quad9.net/dns-query
     - https://cloudflare-dns.com/dns-query
@@ -137,6 +129,20 @@ user_rules: []
 dhcp:
   enabled: false
 filtering:
+  # Local DNS entries for homelab services
+  rewrites:
+    - domain: "jellyfin.{{ homelab_domain }}"
+      answer: "192.168.68.200"    # MetalLB Traefik IP
+      enabled: true
+    - domain: "www.{{ homelab_domain }}"
+      answer: "192.168.68.200"
+      enabled: true
+    - domain: "adguard.{{ homelab_domain }}"
+      answer: "{{ adguard_ip }}"
+      enabled: true
+    - domain: "argocd.{{ homelab_domain }}"
+      answer: "192.168.68.200"
+      enabled: true
   blocking_ipv4: ""
   blocking_ipv6: ""
   blocked_services:
@@ -149,7 +155,6 @@ filtering:
   blocking_mode: default
   parental_block_host: family-block.dns.adguard.com
   safebrowsing_block_host: standard-block.dns.adguard.com
-  rewrites: []
   safe_fs_patterns:
     - /opt/AdGuardHome/
   safebrowsing_cache_size: 1048576
