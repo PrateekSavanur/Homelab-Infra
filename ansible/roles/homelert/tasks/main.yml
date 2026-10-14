@@ -1,0 +1,31 @@
+---
+# Creates the Secret consumed by the homelert Deployment (deployed by ArgoCD).
+# Values come from group_vars/k3s_cluster.yml (gitignored).
+- name: Create homelert namespace
+  ansible.builtin.shell: |
+    kubectl create namespace homelert --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create homelert Secret
+  ansible.builtin.shell: |
+    kubectl -n homelert create secret generic homelert-secrets \
+      --from-literal=TELEGRAM_BOT_TOKEN={{ homelert_telegram_bot_token | quote }} \
+      --from-literal=TELEGRAM_CHAT_ID={{ homelert_telegram_chat_id | quote }} \
+      --from-literal=PROXMOX_HOST={{ homelert_proxmox_host | default('') | quote }} \
+      --from-literal=PROXMOX_TOKEN={{ homelert_proxmox_token | default('') | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Restart homelert to pick up Secret changes
+  ansible.builtin.shell: |
+    if kubectl -n homelert get deployment homelert >/dev/null 2>&1; then
+      kubectl -n homelert rollout restart deployment/homelert
+    fi
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false

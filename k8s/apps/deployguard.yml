@@ -1,0 +1,25 @@
+# DeployGuard deployment-monitoring Application
+# ArgoCD watches the kubernetes/ directory IN THE DEPLOYGUARD REPO
+# The deployguard-secrets Secret is created by Ansible (roles/deployguard)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: deployguard
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/deployguard # <- same as deployguard_repo_url
+    targetRevision: HEAD
+    path: kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: deployguard
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -16,7 +16,9 @@ k3s cluster services (MetalLB range 192.168.68.200–220)
 ├── Traefik      — ingress controller (LoadBalancer)
 ├── cert-manager — TLS certificates
 ├── Jellyfin     — media server  (http://jellyfin.homelab.local)
-└── Website      — nginx site    (http://www.homelab.local)
+├── Website      — nginx site    (http://www.homelab.local)
+├── Homelert     — alerting → Telegram (http://homelert.homelab.local, ArgoCD-managed)
+└── DeployGuard  — deployment tracking (http://deployguard.homelab.local, ArgoCD-managed)
 
 AdGuard Home    — DNS + ad-blocking  (http://192.168.1.50:3000)
 ```
@@ -125,6 +127,8 @@ kubectl -n homelab get pods,svc,ingress
 |-----------------|---------------------------------------|--------------------------------|
 | Jellyfin        | http://jellyfin.homelab.local         | Add AdGuard DNS rewrite or `/etc/hosts` |
 | Website         | http://www.homelab.local              | Replace nginx ConfigMap with your site |
+| Homelert        | http://homelert.homelab.local         | Alert dashboard — deployed by ArgoCD from the homelert repo |
+| DeployGuard     | http://deployguard.homelab.local      | Deployment history & health — password: `deployguard_admin_password` |
 | AdGuard Home    | http://192.168.68.50:3000              | Admin UI — set password on first login |
 | Traefik UI      | http://192.168.68.200:8080/dashboard/  | MetalLB gives Traefik .200     |
 
@@ -132,6 +136,51 @@ kubectl -n homelab get pods,svc,ingress
 
 Set your router's DNS server (DHCP option 6) to **192.168.68.50**.
 All homelab hostnames are pre-configured as rewrites in AdGuard.
+
+---
+
+## Homelert (alerts)
+
+Homelert lives in its own repo (`homelert_repo_url`); ArgoCD syncs its `kubernetes/` folder
+via `k8s/apps/homelert.yml`. Only the Secret is created here, by `playbooks/05-argocd.yml`:
+
+1. Fill in `homelert_telegram_bot_token` / `homelert_telegram_chat_id` (and optionally the
+   `homelert_proxmox_*` vars) in `ansible/inventory/group_vars/k3s_cluster.yml`
+2. `ansible-playbook playbooks/05-argocd.yml`
+
+Images are built by GitHub Actions in the homelert repo (`.github/workflows/deploy.yml`), which
+pins the new tag in `kubernetes/deployment.yaml` — ArgoCD rolls it out automatically.
+
+Webhooks from inside the cluster: `http://homelert.homelert.svc.cluster.local/webhook/<source>`
+
+---
+
+## DeployGuard (deployment tracking)
+
+DeployGuard lives in its own repo (`deployguard_repo_url`); ArgoCD syncs its `kubernetes/` folder
+via `k8s/apps/deployguard.yml`. It records every Argo CD sync as a deployment, links it to the
+previous one (commits / diff), verifies the app's health afterwards and alerts on failures.
+
+```
+Argo CD sync ──(Notifications webhook)──▶ DeployGuard ──▶ health-checks the app in-cluster
+                                               │
+                     failed / rolled back / unhealthy / down
+                                               ▼
+                               Homelert (rule "DeployGuard") ──▶ Telegram
+```
+
+Setup (secrets are generated into `group_vars/k3s_cluster.yml`, which stays out of git):
+
+1. Push the DeployGuard repo and set `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` repo secrets —
+   its GitHub Actions workflow builds the image and pins the tag in `kubernetes/deployment.yaml`
+2. Check the `deployguard_*` vars in `ansible/inventory/group_vars/k3s_cluster.yml`
+3. `ansible-playbook playbooks/05-argocd.yml` — enables Argo CD Notifications, creates
+   `deployguard-secrets` + `argocd-notifications-secret`, and adds the AdGuard DNS rewrite
+4. `ansible-playbook playbooks/03-adguard.yml` if AdGuard wasn't reloaded
+
+Which apps are tracked and their health-check URLs are declared in the DeployGuard repo's
+`kubernetes/configmap.yaml` (project slug = Argo CD Application name, environment = `homelab`).
+Apps not listed there are still tracked — they're created on their first sync.
 
 ---
 
@@ -204,7 +253,9 @@ homelab/
         ├── k3s_master/        # k3s server, Helm, MetalLB, Traefik, cert-manager
         ├── k3s_worker/        # k3s agent, HDD format+mount, node labels
         ├── adguard/           # AdGuard Home binary + config
-        └── k3s_apps/          # Jellyfin + website manifests
+        ├── k3s_apps/          # Jellyfin + website manifests
+        ├── homelert/          # homelert-secrets (Telegram/Proxmox) for the ArgoCD-managed app
+        └── deployguard/       # deployguard-secrets + argocd-notifications-secret
 ```
 
 ## Visual Diagram

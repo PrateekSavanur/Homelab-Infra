@@ -42,5 +42,58 @@ applicationSet:
       cpu: 200m
       memory: 256Mi
 
+# ── Notifications → DeployGuard ──────────────────────────────────
+# Every Application sync is reported to DeployGuard (http://deployguard.homelab.local) as a
+# deployment: project = Application name, environment = "homelab". The bearer token lives in
+# argocd-notifications-secret, created by roles/deployguard (not by this chart).
 notifications:
-  enabled: false      # enable later if you want Slack/email alerts
+  enabled: true
+  argocdUrl: "http://{{ argocd_hostname }}"
+  secret:
+    create: false
+  notifiers:
+    service.webhook.deployguard: |
+      url: http://deployguard.deployguard.svc.cluster.local/api/v1/deployments
+      headers:
+        - name: Authorization
+          value: Bearer $deployguard-integration-key
+        - name: Content-Type
+          value: application/json
+  subscriptions:
+    - recipients:
+        - deployguard
+      triggers:
+        - on-deployguard-sync-running
+        - on-deployguard-sync-finished
+{% raw %}
+  templates:
+    # One sync operation = one deployment: the "started" and "finished" calls share external_id.
+    template.deployguard-sync: |
+      webhook:
+        deployguard:
+          method: POST
+          body: |
+            {
+              "project": "{{.app.metadata.name}}",
+              "environment": "homelab",
+              "commit_sha": "{{.app.status.sync.revision}}",
+              "repo_url": "{{.app.spec.source.repoURL}}",
+              "status": "{{if eq .app.status.operationState.phase "Running"}}started{{else if eq .app.status.operationState.phase "Succeeded"}}succeeded{{else}}failed{{end}}",
+              "external_id": "{{.app.metadata.name}}@{{.app.status.operationState.startedAt}}",
+              "started_at": "{{.app.status.operationState.startedAt}}",
+              "deployer": "{{with .app.status.operationState.operation.initiatedBy}}{{if .automated}}argocd auto-sync{{else}}{{.username}}{{end}}{{end}}",
+              "source": "argocd",
+              "ci_url": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+              "message": "{{call .strings.ReplaceAll .app.status.operationState.message "\"" "'"}}"
+            }
+
+  triggers:
+    trigger.on-deployguard-sync-running: |
+      - when: app.status.operationState != nil and app.status.operationState.phase in ['Running']
+        oncePer: app.status.operationState.startedAt
+        send: [deployguard-sync]
+    trigger.on-deployguard-sync-finished: |
+      - when: app.status.operationState != nil and app.status.operationState.phase in ['Succeeded', 'Error', 'Failed']
+        oncePer: app.status.operationState.startedAt
+        send: [deployguard-sync]
+{% endraw %}

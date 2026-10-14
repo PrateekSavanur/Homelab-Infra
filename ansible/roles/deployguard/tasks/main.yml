@@ -1,0 +1,56 @@
+---
+# Creates the Secrets consumed by the deployguard Deployment (deployed by ArgoCD) and by
+# Argo CD Notifications, which reports every sync to DeployGuard.
+# Values come from group_vars/k3s_cluster.yml (gitignored).
+- name: Check DeployGuard settings
+  ansible.builtin.assert:
+    that:
+      - deployguard_admin_password | default('') | length >= 8
+      - deployguard_session_secret | default('') | length >= 32
+      - deployguard_integration_key | default('') is match('^dg_[A-Za-z0-9_-]{20,}$')
+    fail_msg: >-
+      Set deployguard_admin_password (8+ chars), deployguard_session_secret (openssl rand -hex 32) and
+      deployguard_integration_key ("dg_" + openssl rand -hex 24) in group_vars/k3s_cluster.yml
+    quiet: true
+  no_log: true
+
+- name: Create deployguard namespace
+  ansible.builtin.shell: |
+    kubectl create namespace deployguard --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create deployguard Secret
+  ansible.builtin.shell: |
+    kubectl -n deployguard create secret generic deployguard-secrets \
+      --from-literal=ADMIN_PASSWORD={{ deployguard_admin_password | quote }} \
+      --from-literal=SESSION_SECRET={{ deployguard_session_secret | quote }} \
+      --from-literal=INTEGRATION_API_KEY={{ deployguard_integration_key | quote }} \
+      --from-literal=GITHUB_TOKEN={{ deployguard_github_token | default('') | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+# Referenced as $deployguard-integration-key by the webhook service in argocd-values.yaml.j2.
+# The Helm chart is told not to manage this Secret (notifications.secret.create: false).
+- name: Create Argo CD Notifications Secret
+  ansible.builtin.shell: |
+    kubectl -n argocd create secret generic argocd-notifications-secret \
+      --from-literal=deployguard-integration-key={{ deployguard_integration_key | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Restart deployguard to pick up Secret changes
+  ansible.builtin.shell: |
+    if kubectl -n deployguard get deployment deployguard >/dev/null 2>&1; then
+      kubectl -n deployguard rollout restart deployment/deployguard
+    fi
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false

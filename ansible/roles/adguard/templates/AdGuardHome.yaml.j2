@@ -143,6 +143,12 @@ filtering:
     - domain: "argocd.{{ homelab_domain }}"
       answer: "192.168.68.200"
       enabled: true
+    - domain: "homelert.{{ homelab_domain }}"
+      answer: "192.168.68.200"
+      enabled: true
+    - domain: "deployguard.{{ homelab_domain }}"
+      answer: "192.168.68.200"
+      enabled: true
   blocking_ipv4: ""
   blocking_ipv6: ""
   blocked_services:

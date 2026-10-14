@@ -1,0 +1,25 @@
+# Homelert notification center Application
+# ArgoCD watches the kubernetes/ directory IN THE HOMELERT REPO
+# The homelert-secrets Secret (Telegram / Proxmox) is created by Ansible (roles/homelert)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homelert
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/homelert # <- same as homelert_repo_url
+    targetRevision: HEAD
+    path: kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homelert
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

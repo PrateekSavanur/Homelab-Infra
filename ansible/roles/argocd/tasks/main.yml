@@ -96,6 +96,42 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   changed_when: false
 
+- name: Register homelert repo with ArgoCD
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: homelert-repo
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+    stringData:
+      type: git
+      url: "{{ homelert_repo_url }}"
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Register deployguard repo with ArgoCD
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: deployguard-repo
+      namespace: argocd
+      labels:
+        argocd.argoproj.io/secret-type: repository
+    stringData:
+      type: git
+      url: "{{ deployguard_repo_url }}"
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
 # ── ArgoCD Project ────────────────────────────────────────────────
 - name: Create homelab ArgoCD project
   ansible.builtin.shell: |
@@ -110,6 +146,8 @@
       sourceRepos:
         - {{ homelab_repo_url }}
         - {{ portfolio_repo_url }}
+        - {{ homelert_repo_url }}
+        - {{ deployguard_repo_url }}
       destinations:
         - namespace: "*"
           server: https://kubernetes.default.svc

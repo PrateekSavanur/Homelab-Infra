@@ -5,6 +5,18 @@
   roles:
     - argocd
 
+- name: Create homelert Secret (app itself is deployed by ArgoCD)
+  hosts: k3s_master
+  become: true
+  roles:
+    - homelert
+
+- name: Create DeployGuard + Argo CD Notifications Secrets (app itself is deployed by ArgoCD)
+  hosts: k3s_master
+  become: true
+  roles:
+    - deployguard
+
 - name: Reload AdGuard with ArgoCD DNS entry
   hosts: adguard_hosts
   become: true
