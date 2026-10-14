@@ -82,6 +82,26 @@
     - { key: "net.ipv4.ip_forward",                 value: "1" }
   when: "'k3s_cluster' in group_names"
 
+# Proxmox cloud-init copies the Proxmox host's search domain ("dev") into netplan when the VM
+# has none set. Pods inherit it, so in-cluster names like x.svc.cluster.local get tried as
+# x.svc.cluster.local.dev, which resolves to a public wildcard (Cloudflare) instead of the Service.
+- name: Remove inherited DNS search domain from cloud-init netplan
+  ansible.builtin.replace:
+    path: /etc/netplan/50-cloud-init.yaml
+    regexp: '^[ \t]*search:\n([ \t]*- .*\n)+'
+    replace: ''
+  notify: Apply netplan
+  when: "'k3s_cluster' in group_names"
+  tags: [dns]
+
+- name: Stop cloud-init from regenerating the netplan config on boot
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: "network: {config: disabled}\n"
+    mode: "0644"
+  when: "'k3s_cluster' in group_names"
+  tags: [dns]
+
 - name: Set hostname
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"

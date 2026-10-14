@@ -57,6 +57,9 @@ resource "proxmox_virtual_environment_vm" "k3s_master" {
 
     dns {
       servers = [var.dns_server]
+      # Without a domain, Proxmox injects its own host search domain ("dev"), which breaks
+      # in-cluster DNS for pods (see roles/common "Remove inherited DNS search domain").
+      domain = "homelab.local"
     }
   }
 
@@ -148,6 +151,9 @@ resource "proxmox_virtual_environment_vm" "k3s_worker" {
 
     dns {
       servers = [var.dns_server]
+      # Without a domain, Proxmox injects its own host search domain ("dev"), which breaks
+      # in-cluster DNS for pods (see roles/common "Remove inherited DNS search domain").
+      domain = "homelab.local"
     }
   }
 
@@ -196,6 +202,9 @@ resource "proxmox_virtual_environment_container" "adguard" {
 
     dns {
       servers = [var.dns_server]
+      # Without a domain, Proxmox injects its own host search domain ("dev"), which breaks
+      # in-cluster DNS for pods (see roles/common "Remove inherited DNS search domain").
+      domain = "homelab.local"
     }
   }
 
