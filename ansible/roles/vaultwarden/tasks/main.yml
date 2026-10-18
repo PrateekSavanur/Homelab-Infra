@@ -1,0 +1,38 @@
+---
+# Creates the Secret consumed by the vaultwarden Deployment (deployed by ArgoCD).
+# Values come from group_vars/k3s_cluster.yml (gitignored).
+- name: Check Vaultwarden settings
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_admin_token | default('') is match('^\$argon2id\$')
+    fail_msg: >-
+      Set vaultwarden_admin_token in group_vars/k3s_cluster.yml to an Argon2 hash:
+      docker run --rm -it vaultwarden/server:1.37.4 /vaultwarden hash
+    quiet: true
+  no_log: true
+
+- name: Create vaultwarden namespace
+  ansible.builtin.shell: |
+    kubectl create namespace vaultwarden --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create vaultwarden Secret
+  ansible.builtin.shell: |
+    kubectl -n vaultwarden create secret generic vaultwarden-secrets \
+      --from-literal=ADMIN_TOKEN={{ vaultwarden_admin_token | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Restart vaultwarden to pick up Secret changes
+  ansible.builtin.shell: |
+    if kubectl -n vaultwarden get deployment vaultwarden >/dev/null 2>&1; then
+      kubectl -n vaultwarden rollout restart deployment/vaultwarden
+    fi
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false

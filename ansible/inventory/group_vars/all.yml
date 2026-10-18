@@ -7,6 +7,10 @@ timezone: "America/New_York"   # Change to your timezone
 # cert-manager gets a trusted wildcard cert via Cloudflare DNS-01.
 homelab_domain: "home.prateeksavanur.dev"
 
+# ── AdGuard admin (user: admin) ───────────────────────────────────
+# bcrypt hash of the web UI password — single quotes keep the $ literal
+adguard_admin_password_hash: '$2b$12$KR8eljWWUKurlTkZhpy5x.T7iXbWzALekYWmcbHBaqNWPIJ7xLy/K'
+
 # ── IPs (mirrors terraform.tfvars) ───────────────────────────────
 adguard_ip:     "192.168.68.50"
 k3s_master_ip:  "192.168.68.110"

@@ -17,6 +17,12 @@
   roles:
     - deployguard
 
+- name: Create Vaultwarden Secret (app itself is deployed by ArgoCD)
+  hosts: k3s_master
+  become: true
+  roles:
+    - vaultwarden
+
 - name: Reload AdGuard with ArgoCD DNS entry
   hosts: adguard_hosts
   become: true
