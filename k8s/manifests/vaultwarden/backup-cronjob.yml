@@ -1,0 +1,53 @@
+# Nightly backup: consistent SQLite snapshot + RSA keys + attachments → HDD on the media node.
+# Keeps 30 days. This protects against SSD/PVC loss only — copy /mnt/media/backups offsite too.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vaultwarden-backup
+  namespace: vaultwarden
+spec:
+  schedule: "30 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          nodeSelector:
+            storage-type: media
+          containers:
+            - name: backup
+              image: alpine:3.24.2
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  apk add --no-cache sqlite >/dev/null
+                  ts=$(date +%Y%m%d-%H%M%S)
+                  work=/backup/.tmp-$ts
+                  mkdir -p "$work"
+                  sqlite3 /data/db.sqlite3 ".backup '$work/db.sqlite3'"
+                  sqlite3 "$work/db.sqlite3" "PRAGMA integrity_check;" | grep -qx ok
+                  for f in rsa_key.pem rsa_key.pub.pem config.json attachments sends; do
+                    if [ -e "/data/$f" ]; then cp -a "/data/$f" "$work/"; fi
+                  done
+                  tar -czf "/backup/vaultwarden-$ts.tar.gz" -C "$work" .
+                  rm -rf "$work"
+                  find /backup -name 'vaultwarden-*.tar.gz' -mtime +30 -delete
+                  echo "backup ok: vaultwarden-$ts.tar.gz"
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: vaultwarden-data
+            - name: backup
+              hostPath:
+                path: /mnt/media/backups/vaultwarden
+                type: DirectoryOrCreate

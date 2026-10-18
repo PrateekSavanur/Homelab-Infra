@@ -1,0 +1,14 @@
+# SSD-backed (k3s local-path). Pinned to the media node by the Deployment's nodeSelector
+# so the backup CronJob can reach both this volume and the HDD.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vaultwarden-data
+  namespace: vaultwarden
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

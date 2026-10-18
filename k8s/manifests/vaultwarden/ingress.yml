@@ -1,0 +1,22 @@
+# LAN + Tailscale only: home.prateeksavanur.dev has no public DNS and is NOT routed
+# through the Cloudflare Tunnel. Keep it that way.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: vault.home.prateeksavanur.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vaultwarden
+                port:
+                  number: 80

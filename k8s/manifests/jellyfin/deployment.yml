@@ -41,6 +41,11 @@ spec:
               mountPath: /config
             - name: cache
               mountPath: /cache
+            # Libraries — tg-jellyfin-sync writes to the same paths, so keep them in sync
+            - name: movies
+              mountPath: /data/movies
+            - name: tvshows
+              mountPath: /data/tvshows
           livenessProbe:
             httpGet:
               path: /health
@@ -64,4 +69,12 @@ spec:
         - name: cache
           hostPath:
             path: /mnt/media/jellyfin/cache
+            type: DirectoryOrCreate
+        - name: movies
+          hostPath:
+            path: /mnt/media/movies
+            type: DirectoryOrCreate
+        - name: tvshows
+          hostPath:
+            path: /mnt/media/tvshows
             type: DirectoryOrCreate

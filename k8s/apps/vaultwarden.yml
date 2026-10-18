@@ -1,0 +1,25 @@
+# Vaultwarden password manager Application
+# ArgoCD watches k8s/manifests/vaultwarden in this repo
+# The vaultwarden-secrets Secret (admin token) is created by Ansible (roles/vaultwarden)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vaultwarden
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/Homelab-Infra.git # ← same as homelab_repo_url
+    targetRevision: HEAD
+    path: k8s/manifests/vaultwarden
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vaultwarden
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

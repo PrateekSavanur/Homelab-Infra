@@ -18,7 +18,8 @@ k3s cluster services (MetalLB range 192.168.68.200–220)
 ├── Jellyfin     — media server  (https://jellyfin.home.prateeksavanur.dev)
 ├── Website      — nginx site    (https://www.home.prateeksavanur.dev)
 ├── Homelert     — alerting → Telegram (https://homelert.home.prateeksavanur.dev, ArgoCD-managed)
-└── DeployGuard  — deployment tracking (https://deployguard.home.prateeksavanur.dev, ArgoCD-managed)
+├── DeployGuard  — deployment tracking (https://deployguard.home.prateeksavanur.dev, ArgoCD-managed)
+└── Vaultwarden  — password manager   (https://vault.home.prateeksavanur.dev, ArgoCD-managed, LAN/Tailscale only)
 
 AdGuard Home    — DNS + ad-blocking  (http://192.168.1.50:3000)
 ```
@@ -129,6 +130,7 @@ kubectl -n homelab get pods,svc,ingress
 | Website         | https://www.home.prateeksavanur.dev              | Replace nginx ConfigMap with your site |
 | Homelert        | https://homelert.home.prateeksavanur.dev         | Alert dashboard — deployed by ArgoCD from the homelert repo |
 | DeployGuard     | https://deployguard.home.prateeksavanur.dev      | Deployment history & health — password: `deployguard_admin_password` |
+| Vaultwarden     | https://vault.home.prateeksavanur.dev            | Passwords & API keys — Bitwarden apps, LAN/Tailscale only |
 | AdGuard Home    | http://192.168.68.50:3000              | Admin UI — set password on first login |
 | Traefik UI      | http://192.168.68.200:8080/dashboard/  | MetalLB gives Traefik .200     |
 
@@ -206,6 +208,43 @@ Apps not listed there are still tracked — they're created on their first sync.
 
 ---
 
+## Vaultwarden (passwords & secrets)
+
+Self-hosted Bitwarden-compatible server, deployed by ArgoCD from `k8s/manifests/vaultwarden`
+via `k8s/apps/vaultwarden.yml`. It lives under `home.prateeksavanur.dev`, so it is reachable only
+from the LAN or the tailnet — **never add it to the Cloudflare Tunnel.**
+
+Setup:
+
+1. Generate an admin token hash and set `vaultwarden_admin_token` (single-quoted) in
+   `ansible/inventory/group_vars/k3s_cluster.yml`:
+   ```bash
+   docker run --rm -it vaultwarden/server:1.37.4 /vaultwarden hash
+   ```
+   Keep the plaintext admin password you typed — that is what you enter at `/admin`.
+2. `ansible-playbook playbooks/05-argocd.yml` — creates `vaultwarden-secrets`; ArgoCD syncs the app
+3. Open `https://vault.home.prateeksavanur.dev/admin` → **Users → Invite User** (your email),
+   then go to `https://vault.home.prateeksavanur.dev` → **Create account** with that email.
+   Public sign-ups stay disabled; no SMTP is needed for invites.
+4. In the vault: **Settings → Security → Two-step login** → enable an authenticator app.
+5. iPhone: install Tailscale + Bitwarden → on the login screen choose **Self-hosted** →
+   server URL `https://vault.home.prateeksavanur.dev`. Enable **Settings → Passwords →
+   AutoFill → Bitwarden**. The app keeps an offline copy; Tailscale is only needed to sync.
+
+Backups: the `vaultwarden-backup` CronJob runs nightly at 03:30, snapshots the SQLite DB
+(+ RSA keys, attachments) and writes `vaultwarden-<timestamp>.tar.gz` to
+`/mnt/media/backups/vaultwarden` on k3s-worker-2's HDD, keeping 30 days. That survives SSD/PVC
+loss but **not** loss of the Proxmox host — copy that folder offsite as well.
+
+```bash
+kubectl -n vaultwarden create job --from=cronjob/vaultwarden-backup manual-backup   # test it
+```
+
+Restore: scale the Deployment to 0, extract a tarball over the PVC's `/data`
+(remove `db.sqlite3-wal`/`-shm` first), scale back to 1.
+
+---
+
 ## Customising the Website
 
 Edit `ansible/roles/k3s_apps/files/website/configmap.yml` and replace the `index.html` content,
@@ -277,7 +316,8 @@ homelab/
         ├── adguard/           # AdGuard Home binary + config
         ├── k3s_apps/          # Jellyfin + website manifests
         ├── homelert/          # homelert-secrets (Telegram/Proxmox) for the ArgoCD-managed app
-        └── deployguard/       # deployguard-secrets + argocd-notifications-secret
+        ├── deployguard/       # deployguard-secrets + argocd-notifications-secret
+        └── vaultwarden/       # vaultwarden-secrets (admin token) for the ArgoCD-managed app
 ```
 
 ## Visual Diagram
