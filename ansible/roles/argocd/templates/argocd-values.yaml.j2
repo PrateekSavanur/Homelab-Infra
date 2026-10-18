@@ -43,12 +43,12 @@ applicationSet:
       memory: 256Mi
 
 # ── Notifications → DeployGuard ──────────────────────────────────
-# Every Application sync is reported to DeployGuard (http://deployguard.homelab.local) as a
+# Every Application sync is reported to DeployGuard (https://deployguard.home.prateeksavanur.dev) as a
 # deployment: project = Application name, environment = "homelab". The bearer token lives in
 # argocd-notifications-secret, created by roles/deployguard (not by this chart).
 notifications:
   enabled: true
-  argocdUrl: "http://{{ argocd_hostname }}"
+  argocdUrl: "https://{{ argocd_hostname }}"
   secret:
     create: false
   notifiers:

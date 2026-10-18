@@ -207,7 +207,7 @@
     msg:
       - "============================================"
       - " ArgoCD is ready!"
-      - " URL:      http://{{ argocd_hostname }}"
+      - " URL:      https://{{ argocd_hostname }}"
       - " Username: admin"
       - " Password: {{ argocd_init_password.stdout }}"
       - " Change password after first login!"

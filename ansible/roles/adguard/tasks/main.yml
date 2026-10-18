@@ -32,6 +32,14 @@
     state: directory
     mode: "0755"
 
+- name: Require a real admin password hash
+  ansible.builtin.assert:
+    that: adguard_admin_password_hash | default('') is match('^\\$2[aby]\\$')
+    fail_msg: >-
+      Set adguard_admin_password_hash (bcrypt) in group_vars/all.yml, e.g.
+      python3 -c "import crypt,getpass;print(crypt.crypt(getpass.getpass(),crypt.mksalt(crypt.METHOD_BLOWFISH)))"
+      on the AdGuard LXC. Deploying without it locks you out of the UI.
+
 - name: Deploy AdGuard Home configuration
   ansible.builtin.template:
     src: AdGuardHome.yaml.j2

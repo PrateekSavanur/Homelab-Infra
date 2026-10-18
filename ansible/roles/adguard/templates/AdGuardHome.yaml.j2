@@ -6,7 +6,7 @@ http:
   session_ttl: 720h
 users:
   - name: admin
-    password: $2y$10$CHANGEME_RUN_adguardhome_password_hash   # generate: AdGuardHome -c . --hash <password>
+    password: "{{ adguard_admin_password_hash }}"   # bcrypt, set in group_vars/all.yml
 auth_attempts: 5
 block_auth_min: 15
 http_proxy: ""
@@ -131,22 +131,14 @@ dhcp:
 filtering:
   # Local DNS entries for homelab services
   rewrites:
-    - domain: "jellyfin.{{ homelab_domain }}"
-      answer: "192.168.68.200"    # MetalLB Traefik IP
-      enabled: true
-    - domain: "www.{{ homelab_domain }}"
-      answer: "192.168.68.200"
-      enabled: true
+    # Exact entries win over the wildcard, so adguard.* still points at the LXC.
     - domain: "adguard.{{ homelab_domain }}"
       answer: "{{ adguard_ip }}"
       enabled: true
-    - domain: "argocd.{{ homelab_domain }}"
-      answer: "192.168.68.200"
+    - domain: "{{ homelab_domain }}"
+      answer: "192.168.68.200"    # MetalLB Traefik IP
       enabled: true
-    - domain: "homelert.{{ homelab_domain }}"
-      answer: "192.168.68.200"
-      enabled: true
-    - domain: "deployguard.{{ homelab_domain }}"
+    - domain: "*.{{ homelab_domain }}"
       answer: "192.168.68.200"
       enabled: true
   blocking_ipv4: ""

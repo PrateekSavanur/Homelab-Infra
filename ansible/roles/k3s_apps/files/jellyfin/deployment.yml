@@ -30,7 +30,7 @@ spec:
               name: http
           env:
             - name: JELLYFIN_PublishedServerUrl
-              value: "http://jellyfin.homelab.local"
+              value: "https://jellyfin.home.prateeksavanur.dev"
           resources:
             requests:
               cpu: "500m"

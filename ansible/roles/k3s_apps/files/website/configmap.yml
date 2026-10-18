@@ -27,8 +27,8 @@ data:
         <h1>My Homelab</h1>
         <p>Running on k3s + Proxmox</p>
         <ul>
-          <li><a href="http://jellyfin.homelab.local">🎬 Jellyfin</a></li>
-          <li><a href="http://adguard.homelab.local:3000">🛡️ AdGuard Home</a></li>
+          <li><a href="https://jellyfin.home.prateeksavanur.dev">🎬 Jellyfin</a></li>
+          <li><a href="http://adguard.home.prateeksavanur.dev:3000">🛡️ AdGuard Home</a></li>
         </ul>
       </div>
     </body>

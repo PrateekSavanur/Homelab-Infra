@@ -205,3 +205,64 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   register: cm_install
   changed_when: "'deployed' in cm_install.stdout or 'upgraded' in cm_install.stdout"
+
+# ── TLS: wildcard cert for *.{{ homelab_domain }} ─────────────────
+# Let's Encrypt via Cloudflare DNS-01 (works for LAN-only hosts), installed as
+# Traefik's default certificate so every Ingress gets HTTPS without a tls: block.
+- name: Configure Let's Encrypt wildcard certificate for Traefik
+  ansible.builtin.shell: |
+    kubectl apply -f - <<'EOF'
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: cloudflare-api-token
+      namespace: cert-manager
+    type: Opaque
+    stringData:
+      api-token: "{{ cloudflare_dns_api_token }}"
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
+    metadata:
+      name: letsencrypt
+    spec:
+      acme:
+        server: https://acme-v02.api.letsencrypt.org/directory
+        email: "{{ acme_email }}"
+        privateKeySecretRef:
+          name: letsencrypt-account-key
+        solvers:
+          - dns01:
+              cloudflare:
+                apiTokenSecretRef:
+                  name: cloudflare-api-token
+                  key: api-token
+    ---
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: homelab-wildcard
+      namespace: traefik
+    spec:
+      secretName: homelab-wildcard-tls
+      issuerRef:
+        name: letsencrypt
+        kind: ClusterIssuer
+      dnsNames:
+        - "{{ homelab_domain }}"
+        - "*.{{ homelab_domain }}"
+    ---
+    apiVersion: traefik.io/v1alpha1
+    kind: TLSStore
+    metadata:
+      name: default
+      namespace: traefik
+    spec:
+      defaultCertificate:
+        secretName: homelab-wildcard-tls
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: cloudflare_dns_api_token | length > 0
+  no_log: true
+  changed_when: false

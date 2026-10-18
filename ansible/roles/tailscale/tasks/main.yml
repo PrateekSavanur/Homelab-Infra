@@ -38,12 +38,21 @@
       tailscale up
       --authkey={{ tailscale_auth_key }}
       --hostname={{ inventory_hostname }}
-      --accept-routes
       --ssh
   when: >
     tailscale_status.rc != 0 or
     (tailscale_status.stdout | from_json).BackendState != "Running"
   no_log: true
+
+# Nodes sit on the LAN being advertised; accepting that route would send
+# LAN traffic (and replies to LAN clients) through Tailscale and break it.
+- name: Advertise LAN subnet routes, never accept them
+  ansible.builtin.command:
+    cmd: >-
+      tailscale set
+      --accept-routes=false
+      --advertise-routes={{ tailscale_advertise_routes | default('') }}
+  changed_when: false
 
 - name: Get Tailscale IP
   ansible.builtin.command:

@@ -15,10 +15,10 @@ Proxmox Host (64 GB RAM | 1 TB SSD | 4 TB HDD)
 k3s cluster services (MetalLB range 192.168.68.200–220)
 ├── Traefik      — ingress controller (LoadBalancer)
 ├── cert-manager — TLS certificates
-├── Jellyfin     — media server  (http://jellyfin.homelab.local)
-├── Website      — nginx site    (http://www.homelab.local)
-├── Homelert     — alerting → Telegram (http://homelert.homelab.local, ArgoCD-managed)
-└── DeployGuard  — deployment tracking (http://deployguard.homelab.local, ArgoCD-managed)
+├── Jellyfin     — media server  (https://jellyfin.home.prateeksavanur.dev)
+├── Website      — nginx site    (https://www.home.prateeksavanur.dev)
+├── Homelert     — alerting → Telegram (https://homelert.home.prateeksavanur.dev, ArgoCD-managed)
+└── DeployGuard  — deployment tracking (https://deployguard.home.prateeksavanur.dev, ArgoCD-managed)
 
 AdGuard Home    — DNS + ad-blocking  (http://192.168.1.50:3000)
 ```
@@ -125,10 +125,10 @@ kubectl -n homelab get pods,svc,ingress
 
 | Service         | URL                                   | Notes                          |
 |-----------------|---------------------------------------|--------------------------------|
-| Jellyfin        | http://jellyfin.homelab.local         | Add AdGuard DNS rewrite or `/etc/hosts` |
-| Website         | http://www.homelab.local              | Replace nginx ConfigMap with your site |
-| Homelert        | http://homelert.homelab.local         | Alert dashboard — deployed by ArgoCD from the homelert repo |
-| DeployGuard     | http://deployguard.homelab.local      | Deployment history & health — password: `deployguard_admin_password` |
+| Jellyfin        | https://jellyfin.home.prateeksavanur.dev         | Media server |
+| Website         | https://www.home.prateeksavanur.dev              | Replace nginx ConfigMap with your site |
+| Homelert        | https://homelert.home.prateeksavanur.dev         | Alert dashboard — deployed by ArgoCD from the homelert repo |
+| DeployGuard     | https://deployguard.home.prateeksavanur.dev      | Deployment history & health — password: `deployguard_admin_password` |
 | AdGuard Home    | http://192.168.68.50:3000              | Admin UI — set password on first login |
 | Traefik UI      | http://192.168.68.200:8080/dashboard/  | MetalLB gives Traefik .200     |
 
@@ -136,6 +136,28 @@ kubectl -n homelab get pods,svc,ingress
 
 Set your router's DNS server (DHCP option 6) to **192.168.68.50**.
 All homelab hostnames are pre-configured as rewrites in AdGuard.
+
+### HTTPS
+
+Homelab services live under `home.prateeksavanur.dev`, a subdomain with **no public DNS records**: only AdGuard
+resolves it (wildcard rewrite → Traefik at `192.168.68.200`). cert-manager gets a Let's Encrypt
+wildcard cert for `*.home.prateeksavanur.dev` using a Cloudflare DNS-01 challenge, and Traefik serves it as its
+default cert, so every Ingress gets trusted HTTPS with no `tls:` block. HTTP redirects to HTTPS.
+
+Set `cloudflare_dns_api_token` in `group_vars/k3s_cluster.yml` (Cloudflare → API Tokens →
+"Edit zone DNS" template, zone `prateeksavanur.dev`), then run `playbooks/02-k3s.yml`.
+
+### Access `*.home.prateeksavanur.dev` over Tailscale
+
+Remote tailnet devices don't use AdGuard and can't reach `192.168.68.x` by default.
+`k3s-master-1` advertises `192.168.68.0/24` as a subnet route (`tailscale_advertise_routes`
+in `hosts.yml`, applied by `playbooks/06-tunnel.yml`). Then, in the Tailscale admin console:
+
+1. **Machines → k3s-master-1 → Edit route settings** → approve `192.168.68.0/24`
+2. **DNS → Nameservers → Add nameserver → Custom** → `192.168.68.50`,
+   enable **Restrict to domain** → `home.prateeksavanur.dev`
+3. Remote Linux clients: `sudo tailscale set --accept-routes` (other platforms accept routes by default).
+   Never enable it on the homelab nodes themselves — they are on that LAN and it breaks their networking.
 
 ---
 

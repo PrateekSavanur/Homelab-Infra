@@ -3,7 +3,9 @@
 timezone: "America/New_York"   # Change to your timezone
 
 # ── Homelab domain ────────────────────────────────────────────────
-homelab_domain: "homelab.local"
+# Private subdomain of a real domain: AdGuard resolves it to LAN IPs, and
+# cert-manager gets a trusted wildcard cert via Cloudflare DNS-01.
+homelab_domain: "home.prateeksavanur.dev"
 
 # ── IPs (mirrors terraform.tfvars) ───────────────────────────────
 adguard_ip:     "192.168.68.50"
