@@ -23,6 +23,12 @@
   roles:
     - vaultwarden
 
+- name: Create tg-jellyfin-sync Secret (app itself is deployed by ArgoCD)
+  hosts: k3s_master
+  become: true
+  roles:
+    - tg_jellyfin_sync
+
 - name: Reload AdGuard with ArgoCD DNS entry
   hosts: adguard_hosts
   become: true

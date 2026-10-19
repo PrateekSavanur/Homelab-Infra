@@ -1,0 +1,44 @@
+---
+# Creates the Secret consumed by the tg-jellyfin-sync Deployment (deployed by ArgoCD).
+# Values come from group_vars/k3s_cluster.yml (gitignored).
+- name: Check tg-jellyfin-sync settings
+  ansible.builtin.assert:
+    that:
+      - tg_jellyfin_sync_api_id | default('') | string is match('^\d+$')
+      - tg_jellyfin_sync_api_hash | default('') | length == 32
+      - tg_jellyfin_sync_bot_token | default('') is match('^\d+:[A-Za-z0-9_-]{30,}$')
+    fail_msg: >-
+      Set tg_jellyfin_sync_api_id / tg_jellyfin_sync_api_hash (https://my.telegram.org → API development tools)
+      and tg_jellyfin_sync_bot_token (@BotFather) in group_vars/k3s_cluster.yml
+    quiet: true
+  no_log: true
+
+- name: Create tg-jellyfin-sync namespace
+  ansible.builtin.shell: |
+    kubectl create namespace tg-jellyfin-sync --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create tg-jellyfin-sync Secret
+  ansible.builtin.shell: |
+    kubectl -n tg-jellyfin-sync create secret generic tg-jellyfin-sync-secrets \
+      --from-literal=TG_API_ID={{ tg_jellyfin_sync_api_id | string | quote }} \
+      --from-literal=TG_API_HASH={{ tg_jellyfin_sync_api_hash | quote }} \
+      --from-literal=TG_BOT_TOKEN={{ tg_jellyfin_sync_bot_token | quote }} \
+      --from-literal=TMDB_API_KEY={{ tg_jellyfin_sync_tmdb_api_key | default('') | quote }} \
+      --from-literal=JELLYFIN_API_KEY={{ tg_jellyfin_sync_jellyfin_api_key | default('') | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Restart tg-jellyfin-sync to pick up Secret changes
+  ansible.builtin.shell: |
+    if kubectl -n tg-jellyfin-sync get deployment tg-jellyfin-sync >/dev/null 2>&1; then
+      kubectl -n tg-jellyfin-sync rollout restart deployment/tg-jellyfin-sync
+    fi
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false

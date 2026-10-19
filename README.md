@@ -19,7 +19,8 @@ k3s cluster services (MetalLB range 192.168.68.200–220)
 ├── Website      — nginx site    (https://www.home.prateeksavanur.dev)
 ├── Homelert     — alerting → Telegram (https://homelert.home.prateeksavanur.dev, ArgoCD-managed)
 ├── DeployGuard  — deployment tracking (https://deployguard.home.prateeksavanur.dev, ArgoCD-managed)
-└── Vaultwarden  — password manager   (https://vault.home.prateeksavanur.dev, ArgoCD-managed, LAN/Tailscale only)
+├── Vaultwarden  — password manager   (https://vault.home.prateeksavanur.dev, ArgoCD-managed, LAN/Tailscale only)
+└── tg-jellyfin-sync — imports media posted to a Telegram channel into Jellyfin (ArgoCD-managed, no UI)
 
 AdGuard Home    — DNS + ad-blocking  (http://192.168.1.50:3000)
 ```

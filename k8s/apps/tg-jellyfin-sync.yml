@@ -1,0 +1,25 @@
+# Telegram → Jellyfin importer Application
+# ArgoCD watches the kubernetes/ directory IN THE TG-JELLYFIN-SYNC REPO
+# The tg-jellyfin-sync-secrets Secret is created by Ansible (roles/tg_jellyfin_sync)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tg-jellyfin-sync
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/tg-jellyfin-sync # <- same as tg_jellyfin_sync_repo_url
+    targetRevision: HEAD
+    path: kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tg-jellyfin-sync
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

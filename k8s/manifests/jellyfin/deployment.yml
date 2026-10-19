@@ -41,7 +41,8 @@ spec:
               mountPath: /config
             - name: cache
               mountPath: /cache
-            # Libraries — tg-jellyfin-sync writes to the same paths, so keep them in sync
+            # Libraries — tg-jellyfin-sync mounts /mnt/media/library at /data, so these
+            # paths match in both pods (keep them in sync)
             - name: movies
               mountPath: /data/movies
             - name: tvshows
@@ -72,9 +73,9 @@ spec:
             type: DirectoryOrCreate
         - name: movies
           hostPath:
-            path: /mnt/media/movies
+            path: /mnt/media/library/movies
             type: DirectoryOrCreate
         - name: tvshows
           hostPath:
-            path: /mnt/media/tvshows
+            path: /mnt/media/library/tvshows
             type: DirectoryOrCreate
