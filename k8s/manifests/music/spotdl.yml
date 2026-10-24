@@ -45,6 +45,11 @@ spec:
                 - |
                   set -u
                   spotdl() { uv run --project /app --no-dev --frozen --no-sync spotdl "$@"; }
+                  # YouTube breaks older yt-dlp releases (HTTP 403) faster than spotDL images ship,
+                  # so always run the newest one
+                  uv pip install -q --python /app/.venv/bin/python -U "yt-dlp[default]" \
+                    || echo "yt-dlp upgrade failed, using bundled version"
+                  echo "yt-dlp $(/app/.venv/bin/yt-dlp --version)"
                   mkdir -p /data/music-spotdl/playlists
                   grep -v '^[[:space:]]*#' /config/playlists.txt | {
                     failed=0
@@ -84,7 +89,7 @@ spec:
                   memory: "256Mi"
                 limits:
                   cpu: "2"
-                  memory: "1Gi"
+                  memory: "2Gi"
               volumeMounts:
                 - name: playlists
                   mountPath: /config
