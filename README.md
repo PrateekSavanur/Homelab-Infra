@@ -20,7 +20,8 @@ k3s cluster services (MetalLB range 192.168.68.200–220)
 ├── Homelert     — alerting → Telegram (https://homelert.home.prateeksavanur.dev, ArgoCD-managed)
 ├── DeployGuard  — deployment tracking (https://deployguard.home.prateeksavanur.dev, ArgoCD-managed)
 ├── Vaultwarden  — password manager   (https://vault.home.prateeksavanur.dev, ArgoCD-managed, LAN/Tailscale only)
-└── tg-jellyfin-sync — imports media posted to a Telegram channel into Jellyfin (ArgoCD-managed, no UI)
+├── tg-jellyfin-sync — imports media posted to a Telegram channel into Jellyfin (ArgoCD-managed, no UI)
+└── Music        — Lidarr + slskd + Soularr + spotDL → Jellyfin music library (ArgoCD-managed, LAN/Tailscale only)
 
 AdGuard Home    — DNS + ad-blocking  (http://192.168.1.50:3000)
 ```
@@ -206,6 +207,43 @@ Setup (secrets are generated into `group_vars/k3s_cluster.yml`, which stays out 
 Which apps are tracked and their health-check URLs are declared in the DeployGuard repo's
 `kubernetes/configmap.yaml` (project slug = Argo CD Application name, environment = `homelab`).
 Apps not listed there are still tracked — they're created on their first sync.
+
+---
+
+## Music (Lidarr + Soulseek + spotDL → Jellyfin/Finamp)
+
+Deployed by ArgoCD from `k8s/manifests/music` via `k8s/apps/music.yml`, all on k3s-worker-2:
+
+- **Lidarr** (`https://lidarr.home.prateeksavanur.dev`) — wanted albums; imports into `/mnt/media/library/music`
+- **slskd** (`https://slskd.home.prateeksavanur.dev`, user `admin`) — Soulseek client; shares the music library
+- **Soularr** — every 5 min searches slskd for Lidarr's missing albums and hands the downloads back to Lidarr
+- **spotDL** — nightly CronJob mirroring the playlists in the `spotdl-playlists` ConfigMap into
+  `/mnt/media/library/music-spotdl`, plus one `.m3u8` per playlist that Jellyfin imports as a playlist
+
+Setup:
+
+1. Add to `ansible/inventory/group_vars/k3s_cluster.yml`:
+   ```yaml
+   music_slsk_username: "<new Soulseek name>"   # account is created on first login
+   music_slsk_password: "<password>"
+   music_slskd_web_password: "<12+ chars>"
+   music_slskd_api_key: "<openssl rand -hex 16>"
+   music_lidarr_api_key: "<openssl rand -hex 16>"
+   music_spotify_client_id: ""                  # optional, developer.spotify.com app
+   music_spotify_client_secret: ""
+   ```
+2. `ansible-playbook playbooks/05-argocd.yml` — creates the HDD folders (owned by UID 1000) and
+   the `music-secrets` / `soularr-config` Secrets. Run it **before** the first sync: the hostPath
+   volumes require the folders to exist.
+3. Lidarr: set a login, add root folder `/data/music`, then **Settings → Import Lists → Spotify
+   Playlists** → authenticate and pick playlists (Monitor: *Specific Album*, so you don't get whole
+   discographies).
+4. Playlists for spotDL: add `<name> <url>` lines to `k8s/manifests/music/spotdl.yml` and push.
+   Run once now with `kubectl -n music create job --from=cronjob/spotdl-sync spotdl-now`.
+5. Jellyfin: **Dashboard → Libraries → Add → Music** with folders `/data/music` and `/data/music-spotdl`.
+   Finamp connects to `https://jellyfin.home.prateeksavanur.dev`.
+6. Optional: forward TCP 50300 on the router to 192.168.68.112 (slskd uses a hostPort) for better
+   Soulseek results.
 
 ---
 

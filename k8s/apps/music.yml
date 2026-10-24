@@ -1,0 +1,25 @@
+# Music acquisition stack Application: slskd + Lidarr + Soularr + spotDL
+# ArgoCD watches k8s/manifests/music in this repo
+# The music-secrets and soularr-config Secrets are created by Ansible (roles/music)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: music
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/Homelab-Infra.git # ← same as homelab_repo_url
+    targetRevision: HEAD
+    path: k8s/manifests/music
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: music
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

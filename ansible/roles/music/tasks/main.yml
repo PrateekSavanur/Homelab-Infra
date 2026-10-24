@@ -1,0 +1,63 @@
+---
+# Creates the Secrets consumed by the music stack (deployed by ArgoCD).
+# Values come from group_vars/k3s_cluster.yml (gitignored).
+- name: Check music stack settings
+  ansible.builtin.assert:
+    that:
+      - music_slsk_username | default('') | length > 0
+      - music_slsk_password | default('') | length > 0
+      - music_slskd_web_password | default('') | length >= 12
+      - music_slskd_api_key | default('') | length >= 16
+      - music_lidarr_api_key | default('') is match('^[a-f0-9]{32}$')
+    fail_msg: >-
+      Set music_slsk_username / music_slsk_password (any new Soulseek name — the account is created on first login),
+      music_slskd_web_password (12+ chars), and music_slskd_api_key / music_lidarr_api_key
+      (openssl rand -hex 16) in group_vars/k3s_cluster.yml
+    quiet: true
+  no_log: true
+
+- name: Create music namespace
+  ansible.builtin.shell: |
+    kubectl create namespace music --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create music Secret
+  ansible.builtin.shell: |
+    kubectl -n music create secret generic music-secrets \
+      --from-literal=SLSK_USERNAME={{ music_slsk_username | quote }} \
+      --from-literal=SLSK_PASSWORD={{ music_slsk_password | quote }} \
+      --from-literal=SLSKD_WEB_PASSWORD={{ music_slskd_web_password | quote }} \
+      --from-literal=SLSKD_API_KEY={{ music_slskd_api_key | quote }} \
+      --from-literal=LIDARR_API_KEY={{ music_lidarr_api_key | quote }} \
+      --from-literal=SPOTIFY_CLIENT_ID={{ music_spotify_client_id | default('') | quote }} \
+      --from-literal=SPOTIFY_CLIENT_SECRET={{ music_spotify_client_secret | default('') | quote }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Create Soularr config Secret
+  ansible.builtin.shell: |
+    kubectl -n music create secret generic soularr-config \
+      --from-file=config.ini=/dev/stdin \
+      --dry-run=client -o yaml | kubectl apply -f -
+  args:
+    stdin: "{{ lookup('ansible.builtin.template', 'soularr-config.ini.j2') }}"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+  no_log: true
+
+- name: Restart music stack to pick up Secret changes
+  ansible.builtin.shell: |
+    for d in slskd lidarr soularr; do
+      if kubectl -n music get deployment "$d" >/dev/null 2>&1; then
+        kubectl -n music rollout restart "deployment/$d"
+      fi
+    done
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false

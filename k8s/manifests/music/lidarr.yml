@@ -1,0 +1,95 @@
+# Lidarr — tracks the artists/albums you want and organises imports into the Jellyfin music library.
+# Add Settings → Import Lists → Spotify Playlists to pull the albums from your playlists.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lidarr
+  namespace: music
+  labels:
+    app: lidarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lidarr
+  strategy:
+    type: Recreate          # SQLite — never run two pods against the same DB
+  template:
+    metadata:
+      labels:
+        app: lidarr
+    spec:
+      nodeSelector:
+        storage-type: media
+      containers:
+        - name: lidarr
+          image: lscr.io/linuxserver/lidarr:3.1.0
+          ports:
+            - containerPort: 8686
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "America/New_York"
+            # Fixed API key so Soularr's config can be generated up front
+            - name: LIDARR__AUTH__APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: music-secrets
+                  key: LIDARR_API_KEY
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            # Lidarr root folder — Jellyfin mounts the same directory at /data/music
+            - name: music
+              mountPath: /data/music
+            - name: downloads
+              mountPath: /downloads
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8686
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8686
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: lidarr-config
+        - name: music
+          hostPath:
+            path: /mnt/media/library/music
+            type: Directory
+        - name: downloads
+          hostPath:
+            path: /mnt/media/downloads/soulseek
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lidarr
+  namespace: music
+  labels:
+    app: lidarr
+spec:
+  selector:
+    app: lidarr
+  ports:
+    - name: http
+      port: 8686
+      targetPort: 8686

@@ -1,0 +1,15 @@
+---
+# HDD directories shared by the music stack and Jellyfin, owned by the UID the pods run as.
+# Must exist before ArgoCD syncs: the hostPath volumes use type: Directory, not DirectoryOrCreate
+# (which would create them root-owned and unwritable for the pods).
+- name: Create music directories on the media disk
+  ansible.builtin.file:
+    path: "{{ media_mount_path }}/{{ item }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: "0775"
+  loop:
+    - library/music
+    - library/music-spotdl
+    - downloads/soulseek

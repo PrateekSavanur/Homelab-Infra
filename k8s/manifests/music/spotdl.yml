@@ -1,0 +1,106 @@
+# spotDL — mirrors Spotify playlists track-by-track (audio from YouTube Music) and writes an
+# .m3u8 per playlist, which Jellyfin imports as a playlist. Covers what Lidarr/Soularr can't:
+# exact playlist order and singles that Soulseek doesn't have.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spotdl-playlists
+  namespace: music
+data:
+  # One playlist per line: <name> <spotify playlist URL>
+  # <name> names the sync state file — letters, digits, - and _ only, and never rename it.
+  # Liked Songs has no URL: copy them into a regular playlist in Spotify first.
+  playlists.txt: |
+    old-is-gold https://open.spotify.com/playlist/5yBfxQdSoa3otSED0zwRAo
+    new https://open.spotify.com/playlist/6e4cnpMfefvKVcezL04ODq
+    middle https://open.spotify.com/playlist/0WA20WRN3SpNGNGDw60lzq
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spotdl-sync
+  namespace: music
+spec:
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            storage-type: media
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: spotdl
+              image: spotdl/spotify-downloader:v4.5.2
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -u
+                  spotdl() { uv run --project /app --no-dev --frozen --no-sync spotdl "$@"; }
+                  mkdir -p /data/music-spotdl/playlists
+                  grep -v '^[[:space:]]*#' /config/playlists.txt | {
+                    failed=0
+                    while read -r name url; do
+                      [ -n "$name" ] || continue
+                      state="/state/$name.spotdl"
+                      # First run creates the state file from the URL; later runs sync from it
+                      if [ -f "$state" ]; then set -- "$state"; else set -- "$url" --save-file "$state"; fi
+                      echo "== $name"
+                      # </dev/null: spotdl must not swallow the rest of the playlist list on stdin
+                      spotdl sync "$@" \
+                        --sync-without-deleting \
+                        --format m4a --bitrate disable \
+                        --output "/data/music-spotdl/{album-artist}/{album}/{track-number} - {title}.{output-ext}" \
+                        --m3u "/data/music-spotdl/playlists/{list[0]}.m3u8" \
+                        ${SPOTIFY_CLIENT_ID:+--client-id "$SPOTIFY_CLIENT_ID" --client-secret "$SPOTIFY_CLIENT_SECRET"} \
+                        --print-errors </dev/null || { echo "sync failed: $name"; failed=1; }
+                    done
+                    exit "$failed"
+                  }
+              env:
+                # Optional: your own Spotify app (developer.spotify.com) avoids the shared,
+                # heavily rate-limited default credentials. Empty = use the defaults.
+                - name: SPOTIFY_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: music-secrets
+                      key: SPOTIFY_CLIENT_ID
+                - name: SPOTIFY_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: music-secrets
+                      key: SPOTIFY_CLIENT_SECRET
+              resources:
+                requests:
+                  cpu: "200m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "2"
+                  memory: "1Gi"
+              volumeMounts:
+                - name: playlists
+                  mountPath: /config
+                - name: state
+                  mountPath: /state
+                # Same path as in Jellyfin, so the absolute paths in the .m3u8 files resolve
+                - name: music-spotdl
+                  mountPath: /data/music-spotdl
+          volumes:
+            - name: playlists
+              configMap:
+                name: spotdl-playlists
+            - name: state
+              persistentVolumeClaim:
+                claimName: spotdl-state
+            - name: music-spotdl
+              hostPath:
+                path: /mnt/media/library/music-spotdl
+                type: Directory
