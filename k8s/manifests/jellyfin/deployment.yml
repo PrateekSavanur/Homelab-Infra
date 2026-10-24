@@ -47,12 +47,9 @@ spec:
               mountPath: /data/movies
             - name: tvshows
               mountPath: /data/tvshows
-            # Music library: Lidarr imports into music/, spotDL (tracks + .m3u8 playlists) into
-            # music-spotdl/ — same /data/... paths as in the music namespace pods
+            # Music library — tg-jellyfin-sync files uploaded songs into the same /data/music path
             - name: music
               mountPath: /data/music
-            - name: music-spotdl
-              mountPath: /data/music-spotdl
           livenessProbe:
             httpGet:
               path: /health
@@ -88,8 +85,4 @@ spec:
         - name: music
           hostPath:
             path: /mnt/media/library/music
-            type: DirectoryOrCreate
-        - name: music-spotdl
-          hostPath:
-            path: /mnt/media/library/music-spotdl
             type: DirectoryOrCreate

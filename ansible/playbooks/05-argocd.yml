@@ -29,22 +29,6 @@
   roles:
     - tg_jellyfin_sync
 
-- name: Create music stack directories on the media node
-  hosts: k3s_workers
-  become: true
-  tasks:
-    - name: Create music directories
-      ansible.builtin.include_role:
-        name: music
-        tasks_from: dirs
-      when: node_label_media | default('false') == "true"
-
-- name: Create music stack Secrets (apps themselves are deployed by ArgoCD)
-  hosts: k3s_master
-  become: true
-  roles:
-    - music
-
 - name: Reload AdGuard with ArgoCD DNS entry
   hosts: adguard_hosts
   become: true
