@@ -1,0 +1,25 @@
+# burndown sprint board + Telegram accountability bot
+# ArgoCD watches the kubernetes/ directory IN THE BURNDOWN REPO
+# The burndown-secrets Secret (board password / Telegram token) is created with kubectl, not tracked in git
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: burndown
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/PrateekSavanur/BurnDown
+    targetRevision: HEAD
+    path: kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: burndown
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
